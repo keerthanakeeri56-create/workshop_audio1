@@ -1,47 +1,73 @@
 import streamlit as st
-from audio_recorder_streamlit import audio_recorder
-from deep_translator import GoogleTranslator
+import PyPDF2
 from gtts import gTTS
-import speech_recognition as sr
 from io import BytesIO
 
-# Get a list of supported languages for the dropdown
-langs_dict = GoogleTranslator().get_supported_languages(as_dict=True)
-
 def main():
-    st.image("WhatsApp Image 2026-04-25 at 11.02.18 PM.jpeg")
-    st.title(" PragyanAI - VVIET Workshop: Audio Hub")
+    st.set_page_config(page_title="PragyanAI - VVIET Multimedia Hub", layout="wide")
+    st.image("PragyanAI_Transperent.png")
+    st.title(" PragyanAI Multi-Functional Media Hub")
     
-    audio_bytes = audio_recorder(text="Click to record", neutral_color="#6aa36f")
-    
-    if audio_bytes:
-        st.audio(audio_bytes, format="audio/wav")
-        
-        # Language selection
-        target_lang = st.selectbox("Select Target Language", list(langs_dict.keys()))
-        target_code = langs_dict[target_lang]
+    # Create Tabs for Video, YouTube, and PDF
+    tab1, tab2, tab3 = st.tabs(["📹 Local Video", "📺 YouTube Player", "📄 PDF to Audio"])
 
-        if st.button("Process & Translate"):
+    # --- TAB 1: LOCAL VIDEO PLAYER ---
+    with tab1:
+        st.header("Upload & Play Local Video")
+        video_file = st.file_uploader("Upload MP4/MOV", type=["mp4", "mov", "avi"])
+        if video_file:
+            st.video(video_file)
+
+    # --- TAB 2: YOUTUBE PLAYER ---
+    with tab2:
+        st.header("Stream YouTube Content")
+        yt_url = st.text_input("Paste YouTube URL here", placeholder="https://www.youtube.com/watch?v=...")
+        if yt_url:
             try:
-                # 1. Speech to Text
-                recognizer = sr.Recognizer()
-                with sr.AudioFile(BytesIO(audio_bytes)) as source:
-                    audio_data = recognizer.record(source)
-                    text = recognizer.recognize_google(audio_data)
-                    st.success(f"**Original:** {text}")
-
-                # 2. Translation (Using deep-translator)
-                translated_text = GoogleTranslator(source='auto', target=target_code).translate(text)
-                st.info(f"**Translated:** {translated_text}")
-
-                # 3. Text to Speech
-                tts = gTTS(text=translated_text, lang=target_code)
-                tts_fp = BytesIO()
-                tts.write_to_fp(tts_fp)
-                st.audio(tts_fp)
-
+                st.video(yt_url)
+                st.caption("Now streaming from YouTube")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error("Please enter a valid YouTube URL.")
+
+    # --- TAB 3: PDF READER & AUDIO ---
+    with tab3:
+        st.header("PDF Page-to-Audio Converter")
+        pdf_file = st.file_uploader("Upload your PDF document", type=["pdf"])
+
+        if pdf_file:
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            total_pages = len(pdf_reader.pages)
+            
+            # Layout for controls
+            c1, c2 = st.columns([1, 3])
+            with c1:
+                page_num = st.number_input("Go to Page", min_value=1, max_value=total_pages, value=1) - 1
+            
+            # Extract content
+            page = pdf_reader.pages[page_num]
+            text = page.extract_text()
+
+            # Display and Convert
+            col_text, col_audio = st.columns(2)
+            
+            with col_text:
+                st.subheader(f"Text Preview (Page {page_num + 1})")
+                if text.strip():
+                    st.write(text)
+                else:
+                    st.warning("No text detected on this page (it might be an image).")
+
+            with col_audio:
+                st.subheader("Audio Controls")
+                if text.strip():
+                    if st.button("🔊 Generate Speech for this Page"):
+                        with st.spinner("Converting text to speech..."):
+                            tts = gTTS(text=text, lang='en')
+                            audio_fp = BytesIO()
+                            tts.write_to_fp(audio_fp)
+                            st.audio(audio_fp, format="audio/mp3")
+                else:
+                    st.info("Conversion unavailable for empty or image-only pages.")
 
 if __name__ == "__main__":
-    main()
+    main(
